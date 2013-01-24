@@ -1,3 +1,5 @@
+all: play record
+
 play: play.c
 	gcc play.c -o play -lasound
 
