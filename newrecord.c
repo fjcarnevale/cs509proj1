@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <math.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <alsa/asoundlib.h>
 
 #define BUF_SIZE 8000
@@ -19,7 +20,7 @@ double I1,ITL,ITU,ZCT;
 typedef struct frame{
 	int energy;
 	int zcr;
-	char buffer[80];
+	unsigned char buffer[80];
 	struct frame* prev;
 	struct frame* next;
 }frame;
@@ -30,18 +31,18 @@ typedef struct frame{
 // double mean - mean of the array
 double stddev(int elements[], int count, double mean){
 	int i;
-	int sum = 0;
+	double sum = 0;
 
 	for(i=0;i<count;i++){
 		sum += pow(elements[i]-mean,2);
 	}
-
+	
 	return pow(sum/count,.5);
 }
 
 // computes energy of a sample
 // char* sample - the beginning of the sample
-int energy(char* sample){
+int energy(unsigned char* sample){
 
 	int i;
 	int sum=0;
@@ -57,22 +58,22 @@ int energy(char* sample){
 
 // computes zero cross rate of a sample
 // char* sample - the beginning of the sample
-int zcr(char *sample){
+int zcr(unsigned char *sample){
 	bool below;
 	int crosses = 0;
 	int i;
 
-	if(sample[0] < 0)
+	if(sample[0] < 128)
 		below = true;
 	else
 		below = false;
 
 	
 	for(i=1;i<SAMPLE_SIZE;i++){
-		if(sample[i] > 0 && below){
+		if(sample[i] > 128 && below){
 			crosses++;
 			below = false;
-		}else if(sample[i] < 0 && !below){
+		}else if(sample[i] < 128 && !below){
 			crosses++;
 			below = true;
 		}
@@ -83,10 +84,10 @@ int zcr(char *sample){
 
 void startup(snd_pcm_t** device_handle){
 	
-	char buffer[800];
+	unsigned char buffer[800];
 	int energy_sum = 0;
 	int energy_peak = -999;
-	int energy_min = 1000;
+	int energy_min = 100000;
 	int zcr_sum;
 	int zcr_interval[10];
 	int i;
@@ -96,17 +97,11 @@ void startup(snd_pcm_t** device_handle){
 
 	snd_pcm_readi(*device_handle,buffer,800);
 
-	int tmp_energy;      struct Foo
+	int tmp_energy;
 
-            {
-
-                        int x;
-
-                        int array[100];
-
-            };  /* note semi-colon here */
 	for(i=0;i<10;i++){
 		tmp_energy = energy(&buffer[i*80]);
+		printf("Energy: %d\n",tmp_energy);
 		energy_sum += tmp_energy;
 		if(tmp_energy > energy_peak)
 			energy_peak = tmp_energy;
@@ -136,6 +131,21 @@ void startup(snd_pcm_t** device_handle){
 	else
 		ITL = I2;
 	ITU = 5 * ITL;
+
+	printf("E peak: %d\n", energy_peak);
+	printf("E min : %d\n", energy_min);
+	printf("E avg: %f\n", energy_avg);
+
+	printf("ZCR AVG: %f\n", zcr_avg);
+	printf("ZCR STDDEV: %f\n",zcr_stddev);
+
+	printf("I1: %f\n",I1);
+	printf("I2: %d\n",I2);
+
+	printf("IMX: %d\n",IMX);
+	printf("IMN: %d\n",IMN);
+	printf("ITL: %f\n",ITL);
+	printf("ITU: %f\n",ITU);
 
 }
 
@@ -253,7 +263,15 @@ void record(snd_pcm_t** device_handle){
 	frame* start_frame = NULL;
 	frame* end_frame = NULL; 
 
+	int frame_num = 0;
+
 	while(1){
+		if(frame_num == 0){
+//			printf("E: %d\n",current_frame->energy);
+	
+		}
+		frame_num = (frame_num+1)%100;
+		
 		frame* tmp_frame = (frame*)malloc(sizeof(frame));
 		snd_pcm_readi(*device_handle,tmp_frame->buffer,sizeof(char)*80);
 		fwrite(tmp_frame->buffer, sizeof(char), 80, sound_raw);
@@ -263,10 +281,12 @@ void record(snd_pcm_t** device_handle){
 		current_frame->next = tmp_frame;
 		current_frame = tmp_frame;
 
-		if(current_frame->energy > ITL && !start_frame){
+
+		if(current_frame->energy > ITL && start_frame==NULL){
 			start_frame = current_frame;
 		}
-		if(current_frame->energy > ITU){
+		if(current_frame->energy > ITU && !speech){
+			printf("Speech!\n");
 			speech = true;
 			start_frame = (frame*)zcr_start_search(start_frame);
 		}
@@ -275,6 +295,12 @@ void record(snd_pcm_t** device_handle){
 				printf("No more speech!\n");
 				end_frame = zcr_end_search(device_handle, &current_frame);
 				speech=false;
+
+				write_speech(start_frame,end_frame);
+					
+				start_frame = NULL;
+				end_frame = NULL;		
+	
 			}else{
 				start_frame = NULL;
 			}	
