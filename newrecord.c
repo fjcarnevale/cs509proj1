@@ -18,7 +18,7 @@ int IMX,IMN,I2;
 double I1,ITL,ITU,ZCT;
 
 typedef struct frame{
-	int energy;
+	double energy;
 	int zcr;
 	unsigned char buffer[80];
 	struct frame* prev;
@@ -42,17 +42,17 @@ double stddev(int elements[], int count, double mean){
 
 // computes energy of a sample
 // char* sample - the beginning of the sample
-int energy(unsigned char* sample){
+double energy(unsigned char* sample){
 
 	int i;
-	int sum=0;
+	double sum=0;
 
 	sample = &(sample[SAMPLE_SIZE/2]);
 	for(i=-40;i<40;i++){
-		sum += sample[i];
+		sum += abs(sample[i]-128);
 	}
 
-	return sum;
+	return sum;// / 80;
 
 }
 
@@ -86,8 +86,8 @@ void startup(snd_pcm_t** device_handle){
 	
 	unsigned char buffer[800];
 	int energy_sum = 0;
-	int energy_peak = -999;
-	int energy_min = 100000;
+	double energy_peak = -999;
+	double energy_min = 100000;
 	int zcr_sum;
 	int zcr_interval[10];
 	int i;
@@ -97,11 +97,11 @@ void startup(snd_pcm_t** device_handle){
 
 	snd_pcm_readi(*device_handle,buffer,800);
 
-	int tmp_energy;
+	double tmp_energy;
 
 	for(i=0;i<10;i++){
 		tmp_energy = energy(&buffer[i*80]);
-		printf("Energy: %d\n",tmp_energy);
+		printf("Energy: %f\n",tmp_energy);
 		energy_sum += tmp_energy;
 		if(tmp_energy > energy_peak)
 			energy_peak = tmp_energy;
@@ -126,14 +126,16 @@ void startup(snd_pcm_t** device_handle){
 	IMN = energy_min;
 	I1 = .03 * (IMX - IMN) + IMN;
 	I2 = 4 * IMN;
-	if(I1<I2)
+	if(I1<I2){
 		ITL = I1;
-	else
+	}else{
 		ITL = I2;
+	}
+
 	ITU = 5 * ITL;
 
-	printf("E peak: %d\n", energy_peak);
-	printf("E min : %d\n", energy_min);
+	printf("E peak: %f\n", energy_peak);
+	printf("E min : %f\n", energy_min);
 	printf("E avg: %f\n", energy_avg);
 
 	printf("ZCR AVG: %f\n", zcr_avg);
@@ -267,13 +269,14 @@ void record(snd_pcm_t** device_handle){
 
 	while(1){
 		if(frame_num == 0){
-//			printf("E: %d\n",current_frame->energy);
+			printf("E: %f\n",current_frame->energy);
 	
 		}
-		frame_num = (frame_num+1)%100;
+		frame_num = (frame_num+1)%10;
 		
 		frame* tmp_frame = (frame*)malloc(sizeof(frame));
 		snd_pcm_readi(*device_handle,tmp_frame->buffer,sizeof(char)*80);
+
 		fwrite(tmp_frame->buffer, sizeof(char), 80, sound_raw);
 		// can still do sound.data in the signint handler
 		tmp_frame->energy = energy(tmp_frame->buffer);
