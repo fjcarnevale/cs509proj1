@@ -10,6 +10,7 @@
 
 FILE* sound_raw;
 FILE* sound_data;
+FILE* speech_raw;
 snd_pcm_t* handle;
 
 int IMX,IMN,I2;
@@ -139,6 +140,7 @@ void startup(snd_pcm_t** device_handle){
 }
 
 void handle_sigint(int s){
+	/*
 	rewind(sound_raw);
 	char buffer[8000];
 	char tmp[6];
@@ -158,12 +160,13 @@ void handle_sigint(int s){
 		strcat(tmp,",\n");
 		fwrite(tmp, sizeof(char), strlen(tmp), sound_data);	
 	}
-
+	*/
+	// For now, make sure I didn't break recording
 
 	fclose(sound_raw);
 	fclose(sound_data);
 	snd_pcm_close(handle);	
-	exit(1);
+	exit(0);
 }
 
 // Opens and sets the parameters for recording
@@ -190,6 +193,52 @@ int setup_device(snd_pcm_t** device_handle){
 	return 0;
 }
 
+frame* zcr_start_search(frame* current_frame){
+	frame* tmp_frame = current_frame;
+	int frame_count = 0;
+
+	while(frame_count < 25 && tmp_frame->zcr > ZCT && tmp_frame->prev != NULL){
+		tmp_frame = tmp_frame->prev;
+		frame_count++;
+	}
+
+	if(frame_count<3)
+		return current_frame;
+	return tmp_frame;
+
+}
+
+frame* zcr_end_search(snd_pcm_t** device_handle, frame** old_frame){
+	frame* current_frame = *old_frame;	
+	frame* tmp_frame;
+	int frame_count = 0;
+
+	while(frame_count < 25 && current_frame->zcr > ZCT){
+		tmp_frame = (frame*)malloc(sizeof(frame));
+		snd_pcm_readi(*device_handle,tmp_frame->buffer,sizeof(char)*80);
+		tmp_frame->energy = energy(tmp_frame->buffer);
+		tmp_frame->zcr    = zcr(tmp_frame->buffer);
+		current_frame->next = tmp_frame;
+		current_frame = tmp_frame;
+		frame_count++;
+	}
+
+	if(frame_count<3)
+		return *old_frame;
+	return tmp_frame;
+	
+
+}
+
+void write_speech(frame* start, frame* end){
+
+	while(start != end){
+		fwrite(start->buffer, sizeof(char), 80, speech_raw);
+		start = start->next;
+	}
+
+}
+
 void record(snd_pcm_t** device_handle){
 	bool speech = false;
 
@@ -207,6 +256,8 @@ void record(snd_pcm_t** device_handle){
 	while(1){
 		frame* tmp_frame = (frame*)malloc(sizeof(frame));
 		snd_pcm_readi(*device_handle,tmp_frame->buffer,sizeof(char)*80);
+		fwrite(tmp_frame->buffer, sizeof(char), 80, sound_raw);
+		// can still do sound.data in the signint handler
 		tmp_frame->energy = energy(tmp_frame->buffer);
 		tmp_frame->zcr    = zcr(tmp_frame->buffer);
 		current_frame->next = tmp_frame;
@@ -217,12 +268,13 @@ void record(snd_pcm_t** device_handle){
 		}
 		if(current_frame->energy > ITU){
 			speech = true;
-			// find beginning of speech
-			// write all frames until now to speech.raw
+			start_frame = (frame*)zcr_start_search(start_frame);
 		}
 		if(current_frame->energy < ITL){
 			if(speech){
-				end_frame = current_frame;
+				printf("No more speech!\n");
+				end_frame = zcr_end_search(device_handle, &current_frame);
+				speech=false;
 			}else{
 				start_frame = NULL;
 			}	
@@ -231,6 +283,8 @@ void record(snd_pcm_t** device_handle){
 	}
 
 }
+
+
 
 int main(int argc, char** argv){
 
@@ -251,6 +305,12 @@ int main(int argc, char** argv){
 	sound_data = fopen("sound.data","w+");
 	if(sound_data == NULL){
 		printf("Failed to open sound.data\n");
+		return -1;
+	}
+
+	speech_raw = fopen("speech.raw","w+");
+	if(speech_raw == NULL){
+		printf("Failed to open speech_raw\n");
 		return -1;
 	}
 
