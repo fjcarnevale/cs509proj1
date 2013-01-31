@@ -1,15 +1,14 @@
-default: newrecord.c
-	gcc newrecord.c -o newrecord -lasound
-
-play: play.c
-	gcc play.c -o play -lasound
+all: record play
 
 record: record.c
 	gcc record.c -o record -lasound
 
-speaker_test: speaker_test.c
-	gcc speaker_test.c -o speaker_test -lasound
+play: play.c
+	gcc play.c -o play -lasound
 
 clean:
-	rm play record newrecord sound.raw sound.data speech.raw
+	rm record play
+
+clean-data:
+	rm sound.raw speech.raw sound.data energy.data zero.data
 
