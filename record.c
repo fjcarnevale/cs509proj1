@@ -196,13 +196,13 @@ int main(int argc, char** argv){
 	sigIntHandler.sa_flags = 0;
 	sigaction(SIGINT, &sigIntHandler, NULL);
 
-	sound_raw = fopen("sound.raw","rw");
+	sound_raw = fopen("sound.raw","w+");
 	if(sound_raw==NULL){
 		printf("Failed to open sound.raw\n");
 		return -1;
 	}
 
-	sound_data = fopen("sound.data","w");
+	sound_data = fopen("sound.data","w+");
 	if(sound_data == NULL){
 		printf("Failed to open sound.data\n");
 		return -1;
@@ -210,7 +210,7 @@ int main(int argc, char** argv){
 
 	setup_device(&handle);
 
-	//startup(&handle)
+	startup(&handle);
 
 	record(&handle);
 }
