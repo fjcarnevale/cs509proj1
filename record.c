@@ -168,7 +168,6 @@ void handle_sigint(int s){
 			strcat(tmp,",\n");
 			strcat(out_buffer,tmp);
 		}
-		printf("Writing %d bytes to sound_data\n",read);
 		fwrite(out_buffer,sizeof(char), read, sound_data);
 		read = fread(buffer,sizeof(char),8000,sound_raw);
 	}
