@@ -155,7 +155,6 @@ void startup(snd_pcm_t** device_handle){
 }
 
 void handle_sigint(int s){
-/*	
 	rewind(sound_raw);
 	unsigned char buffer[8000];
 	char out_buffer[40000];
@@ -173,7 +172,6 @@ void handle_sigint(int s){
 		fwrite(out_buffer,sizeof(char), read, sound_data);
 		read = fread(buffer,sizeof(char),8000,sound_raw);
 	}
-*/
 	fclose(sound_raw);
 	fclose(sound_data);
 	fclose(speech_raw);
