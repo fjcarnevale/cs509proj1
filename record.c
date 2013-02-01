@@ -1,3 +1,6 @@
+// Frank Carnevale
+// CS 529 Project 1
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -104,7 +107,7 @@ void startup(snd_pcm_t** device_handle){
 
 	for(i=0;i<10;i++){
 		tmp_energy = energy(&buffer[i*80]);
-		printf("Energy: %f\n",tmp_energy);
+		//printf("Energy: %f\n",tmp_energy);
 		energy_sum += tmp_energy;
 		if(tmp_energy > energy_peak)
 			energy_peak = tmp_energy;
@@ -126,7 +129,7 @@ void startup(snd_pcm_t** device_handle){
 		ZCT = 25;
 
 	IMX = energy_peak;
-	IMN = energy_min;
+	IMN = energy_avg;
 	I1 = .03 * (IMX - IMN) + IMN;
 	I2 = 4 * IMN;
 	if(I1<I2){
@@ -137,6 +140,7 @@ void startup(snd_pcm_t** device_handle){
 
 	ITU = 5 * ITL;
 
+/*
 	printf("E peak: %f\n", energy_peak);
 	printf("E min : %f\n", energy_min);
 	printf("E avg: %f\n", energy_avg);
@@ -151,13 +155,14 @@ void startup(snd_pcm_t** device_handle){
 	printf("IMN: %d\n",IMN);
 	printf("ITL: %f\n",ITL);
 	printf("ITU: %f\n",ITU);
+*/
 
 }
 
 void handle_sigint(int s){
 	rewind(sound_raw);
 	unsigned char buffer[8000];
-	char out_buffer[40000];
+	char out_buffer[40001];
 	char tmp[5]; 
 	int i;
 	size_t read = fread(buffer, sizeof(char), 8000, sound_raw);
@@ -168,7 +173,7 @@ void handle_sigint(int s){
 			strcat(tmp,",\n");
 			strcat(out_buffer,tmp);
 		}
-		fwrite(out_buffer,sizeof(char), read, sound_data);
+		fwrite(out_buffer,sizeof(char), strlen(out_buffer), sound_data);
 		read = fread(buffer,sizeof(char),8000,sound_raw);
 	}
 	fclose(sound_raw);

@@ -44,7 +44,7 @@ int main(int argc, char** argv){
 
 	size_t read = fread(buffer, sizeof(char), BUF_SIZE, fp);
 	while(read > 0){ // while we haven't hit the end of the file
-		snd_pcm_writei(handle, buffer, 16000);
+		snd_pcm_writei(handle, buffer, read);
 		read = fread(buffer,sizeof(char), BUF_SIZE, fp);
 	}
 	snd_pcm_close(handle);
