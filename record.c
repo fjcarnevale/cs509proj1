@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <alsa/asoundlib.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #define BUF_SIZE 8000
 #define SAMPLE_SIZE 80
@@ -26,7 +28,7 @@ double I1,ITL,ITU,ZCT;
 typedef struct frame{
 	double energy;
 	int zcr;
-	unsigned char buffer[80];
+	unsigned char buffer[SAMPLE_SIZE];
 	struct frame* prev;
 	struct frame* next;
 }frame;
@@ -54,11 +56,11 @@ double energy(unsigned char* sample){
 	double sum=0;
 
 	sample = &(sample[SAMPLE_SIZE/2]);
-	for(i=-40;i<40;i++){
-		sum += abs(sample[i]-128);
+	for(i=-(SAMPLE_SIZE/2);i<(SAMPLE_SIZE/2);i++){
+		sum += abs(sample[i]-127);
 	}
 
-	return sum;// / 80;
+	return sum;
 
 }
 
@@ -69,17 +71,17 @@ int zcr(unsigned char *sample){
 	int crosses = 0;
 	int i;
 
-	if(sample[0] < 128)
+	if(sample[0] < 127)
 		below = true;
 	else
 		below = false;
 
 	
 	for(i=1;i<SAMPLE_SIZE;i++){
-		if(sample[i] > 128 && below){
+		if(sample[i] > 127 && below){
 			crosses++;
 			below = false;
-		}else if(sample[i] < 128 && !below){
+		}else if(sample[i] < 127 && !below){
 			crosses++;
 			below = true;
 		}
@@ -90,7 +92,7 @@ int zcr(unsigned char *sample){
 
 void startup(snd_pcm_t** device_handle){
 	
-	unsigned char buffer[800];
+	unsigned char buffer[SAMPLE_SIZE*10];
 	int energy_sum = 0;
 	double energy_peak = -999;
 	double energy_min = 100000;
@@ -101,12 +103,12 @@ void startup(snd_pcm_t** device_handle){
 	double zcr_avg;
 	double zcr_stddev;
 
-	snd_pcm_readi(*device_handle,buffer,800);
+	snd_pcm_readi(*device_handle,buffer,SAMPLE_SIZE*10);
 
 	double tmp_energy;
 
 	for(i=0;i<10;i++){
-		tmp_energy = energy(&buffer[i*80]);
+		tmp_energy = energy(&buffer[i*SAMPLE_SIZE]);
 		//printf("Energy: %f\n",tmp_energy);
 		energy_sum += tmp_energy;
 		if(tmp_energy > energy_peak)
@@ -114,7 +116,7 @@ void startup(snd_pcm_t** device_handle){
 		else if(tmp_energy < energy_min)
 			energy_min = tmp_energy;
 
-		zcr_interval[i] = zcr(&buffer[i*80]);
+		zcr_interval[i] = zcr(&buffer[i*SAMPLE_SIZE]);
 		zcr_sum += zcr_interval[i];
 	}
 
@@ -367,5 +369,11 @@ int main(int argc, char** argv){
 	startup(&handle);
 
 	record(&handle);
+
+	FILE* status = fopen("/proc/self/status","r");
+	char buffer[128];
+	while(fread(buffer,sizeof(char), 128, status)){
+		printf("%s",buffer);
+	}
 }
 
