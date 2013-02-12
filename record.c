@@ -164,7 +164,7 @@ void startup(snd_pcm_t** device_handle){
 void handle_sigint(int s){
 	rewind(sound_raw);
 	unsigned char buffer[8000];
-	char out_buffer[40001];
+	char out_buffer[102400];
 	char tmp[5]; 
 	int i;
 	size_t read = fread(buffer, sizeof(char), 8000, sound_raw);
@@ -185,6 +185,14 @@ void handle_sigint(int s){
 	fclose(zero_data);
 
 	snd_pcm_close(handle);	
+
+
+	FILE* status = fopen("/proc/self/status","r");
+	char* status_string = (char*)malloc(sizeof(char)*1024);
+	while(fread(status_string,sizeof(char), 128, status)){
+		printf("%s",status_string);
+	}
+
 	exit(0);
 }
 
@@ -369,11 +377,5 @@ int main(int argc, char** argv){
 	startup(&handle);
 
 	record(&handle);
-
-	FILE* status = fopen("/proc/self/status","r");
-	char buffer[128];
-	while(fread(buffer,sizeof(char), 128, status)){
-		printf("%s",buffer);
-	}
 }
 
