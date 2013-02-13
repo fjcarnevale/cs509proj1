@@ -266,6 +266,23 @@ void write_speech(frame* start, frame* end){
 
 }
 
+void timeval_diff(struct timeval* result, struct timeval* x, struct timeval* y){
+	if(x->tv_usec < y->tv_usec){
+		int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+		y->tv_usec -= 1000000 * nsec;
+		y->tv_sec += nsec;
+	}
+
+	if(x->tv_usec - y->tv_usec > 1000000){
+		int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+		y->tv_usec += 1000000 * nsec;
+		y->tv_sec -= nsec;
+	}
+
+	result->tv_sec = x->tv_sec - y->tv_sec;
+	result->tv_usec = x->tv_usec - y->tv_usec;
+}
+
 void record(snd_pcm_t** device_handle){
 	bool speech = false;
 	char tmp[16];
@@ -283,10 +300,13 @@ void record(snd_pcm_t** device_handle){
 	frame* end_frame = NULL; 
 
 	int frame_num = 0;
-
+	struct timeval alg_start, alg_end, difference;
+	long total_proc_time = 0;
 	while(1){
 		frame* tmp_frame = (frame*)malloc(sizeof(frame));
 		snd_pcm_readi(*device_handle,tmp_frame->buffer,sizeof(char)*80);
+		gettimeofday(&alg_start,NULL);
+
 		fwrite(tmp_frame->buffer, sizeof(char), 80, sound_raw);
 		tmp_frame->energy = energy(tmp_frame->buffer);
 		tmp_frame->zcr    = zcr(tmp_frame->buffer);
@@ -326,6 +346,9 @@ void record(snd_pcm_t** device_handle){
 		strcat(tmp,",\n");
 		fwrite(tmp,sizeof(char),strlen(tmp),zero_data);
 	
+		gettimeofday(&alg_end,NULL);
+		timeval_diff(&difference, &alg_start, &alg_end);
+		total_proc_time += difference.tv_sec * 1000000 + difference.tv_usec;
 	}
 
 }
